@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Status do Ar-condicionado</title>
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      .containerWrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 1rem;
+        padding: 0 1rem;
+      }
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #e9ecef;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        gap: 1rem;
+      }
+      .container {
+        text-align: center;
+        padding: 20px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+      header {
+        padding: 1.5rem;
+        background-color: #007bff;
+        color: white;
+        font-size: 1.5rem;
+      }
+      header > span > span {
+        font-weight: bold;
+      }
+
+      h1 {
+        font-size: 24px;
+        color: #007bff;
+      }
+      p {
+        font-size: 18px;
+        font-weight: bold;
+      }
+      .status {
+        font-size: 20px;
+        padding: 10px 20px;
+        border-radius: 8px;
+        color: white;
+        display: inline-block;
+        background-color: #007bff;
+      }
+      .status.ligado {
+        background-color: #28a745;
+      }
+      .status.desligado {
+        background-color: #dc3545;
+      }
+      .chart-container {
+        display: flex;
+        width: 100%;
+      }
+      .chart-container > div {
+        padding: 1rem;
+        flex: 1;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      let temperatureChart;
+      let humidityChart;
+
+      async function atualizarStatus() {
+        function changeElement(id, value, className) {
+          const element = document.getElementById(id);
+          element.className = `status ${className}`;
+          element.innerHTML = value;
+        }
+
+        try {
+          const response = await fetch("/status", { method: "GET" });
+          const data = await response.json();
+          const { humidity, temperature, date, airConditioning, humidifier, list } = data;
+
+          changeElement("airConditioning", airConditioning ? "ligado" : "desligado", airConditioning ? "ligado" : "desligado");
+          changeElement("humidifier", humidifier ? "ligado" : "desligado", humidifier ? "ligado" : "desligado");
+          changeElement("temperature", `${temperature} °C`, "");
+          changeElement("humidity", `${humidity}%`, "");
+          changeElement("timestamp", date, "");
+
+          atualizarGraficos(list);
+        } catch (error) {
+          console.error("Erro ao atualizar o status:", error);
+        }
+      }
+
+      function atualizarGraficos(list) {
+        if (!temperatureChart || !humidityChart) return;
+
+        const existingDataLength = temperatureChart.data.labels.length;
+        const newDataLength = list.length;
+
+        if (newDataLength > existingDataLength) {
+          const newTemperatureData = list.slice(existingDataLength).map(x => x.temperature);
+          const newHumidityData = list.slice(existingDataLength).map(x => x.humidity);
+          const newLabels = list.slice(existingDataLength).map(x => x.date);
+
+          temperatureChart.data.labels.push(...newLabels);
+          temperatureChart.data.datasets[0].data.push(...newTemperatureData);
+
+          humidityChart.data.labels.push(...newLabels);
+          humidityChart.data.datasets[0].data.push(...newHumidityData);
+
+          temperatureChart.update();
+          humidityChart.update();
+        }
+      }
+
+      function inicializarGraficos(list) {
+        const temperatureCtx = document.getElementById("temperatureChart").getContext("2d");
+        const humidityCtx = document.getElementById("humidityChart").getContext("2d");
+
+        temperatureChart = new Chart(temperatureCtx, {
+          type: "line",
+          data: {
+            labels: list.map(x => x.date),
+            datasets: [{
+              label: "Temperatura",
+              data: list.map(x => x.temperature),
+              borderColor: "#f00",
+              backgroundColor: "#ff000020",
+              borderWidth: 2,
+              tension: 0.4,
+            }],
+          },
+          options: { responsive: true },
+        });
+
+        humidityChart = new Chart(humidityCtx, {
+          type: "line",
+          data: {
+            labels: list.map(x => x.date),
+            datasets: [{
+              label: "Umidade",
+              data: list.map(x => x.humidity),
+              borderColor: "#00f",
+              backgroundColor: "#0000ff20",
+              borderWidth: 2,
+              tension: 0.4,
+            }],
+          },
+          options: { responsive: true },
+        });
+      }
+
+      window.onload = async () => {
+        const response = await fetch("/status", { method: "GET" });
+        const data = await response.json();
+        inicializarGraficos(data.list);
+        setInterval(atualizarStatus, 1000);
+      };
+    </script>
+  </head>
+  <body>
+    <header>
+      <span>Ultima leitura do sensor: <span id="timestamp"></span></span>
+    </header>
+    <div class="containerWrapper">
+      <div class="container">
+        <h1>Temperatura</h1>
+        <span class="status" id="temperature">Carregando...</span>
+      </div>
+      <div class="container">
+        <h1>Umidade</h1>
+        <span class="status" id="humidity">Carregando...</span>
+      </div>
+    </div>
+    <div class="containerWrapper">
+      <div class="container">
+        <h1>Status do refrigerador</h1>
+        <span class="status" id="airConditioning">Carregando...</span>
+      </div>
+      <div class="container">
+        <h1>Status do umidificador</h1>
+        <span class="status" id="humidifier">Carregando...</span>
+      </div>
+    </div>
+    <div class="chart-container">
+      <div>
+        <h2>Gráfico de temperatura</h2>
+        <canvas id="temperatureChart" width="400" height="200"></canvas>
+      </div>
+      <div>
+        <h2>Gráfico de umidade</h2>
+        <canvas id="humidityChart" width="400" height="200"></canvas>
+      </div>
+    </div>
+  </body>
+</html>
