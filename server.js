@@ -87,6 +87,9 @@ app.post("/status", function (req, res) {
     var _data = { humidity: parsed.humidity, temperature: parsed.temperature, date: new Date() };
     var list = addDatabase(_data);
 
+    console.log("Dados criptografados recebidos:", encrypted);
+    console.log("Dados Descriptografados:", parsed)
+
     data = {
       humidity: parsed.humidity,
       temperature: parsed.temperature,
@@ -96,7 +99,13 @@ app.post("/status", function (req, res) {
       humidifier: parsed.humidity < 60,
       list: list,
     };
-    res.status(200).json(data);
+
+    dataRES = {
+      airConditioning: data.airConditioning,
+      humidifier: data.humidifier,
+      message: "Status atualizado com sucesso",  // Mensagem simples sem os dados do sensor
+    };
+    res.status(200).json(dataRES);
   } catch (err) {
     console.error("Error processing request:", err);
     res.status(500).send("Error processing request");
@@ -111,5 +120,5 @@ app.get("/", function (_, res) {
 // Inicialização do servidor
 app.listen(port, function () {
   console.log("Servidor rodando na porta " + port);
-  ensureDatabase(); // Garantir que o arquivo exista
+  ensureDatabase(); // Garantir que o arquivo exista
 });
